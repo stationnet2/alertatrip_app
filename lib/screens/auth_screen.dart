@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../l10n/app_localizations.dart';
 
 class AuthScreen extends StatefulWidget {
   final VoidCallback? onSuccess;
@@ -39,15 +38,13 @@ class _AuthScreenState extends State<AuthScreen> {
         );
         if (widget.onSuccess != null) {
           widget.onSuccess!();
-        } else if (mounted) {
-          Navigator.of(context).pop();
         }
       } else {
         if (_passCtrl.text.length < 6) {
-          throw FirebaseAuthException(code: 'weak-password', message: 'La contrasena debe tener al menos 6 caracteres.');
+          throw FirebaseAuthException(code: 'weak-password', message: 'La contraseña debe tener al menos 6 caracteres.');
         }
         if (_passCtrl.text != _pass2Ctrl.text) {
-          throw FirebaseAuthException(code: 'passwords-dont-match', message: 'Las contrasenas no coinciden.');
+          throw FirebaseAuthException(code: 'passwords-dont-match', message: 'Las contraseñas no coinciden.');
         }
         final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailCtrl.text.trim(),
@@ -59,12 +56,12 @@ class _AuthScreenState extends State<AuthScreen> {
     } on FirebaseAuthException catch (e) {
       final msgs = {
         'user-not-found': 'No existe una cuenta con ese email.',
-        'wrong-password': 'Contrasena incorrecta.',
-        'invalid-credential': 'Email o contrasena incorrectos.',
-        'invalid-email': 'Email no valido.',
+        'wrong-password': 'Contraseña incorrecta.',
+        'invalid-credential': 'Email o contraseña incorrectos.',
+        'invalid-email': 'Email no válido.',
         'email-already-in-use': 'Ya existe una cuenta con ese email.',
-        'weak-password': 'La contrasena es muy debil.',
-        'passwords-dont-match': 'Las contrasenas no coinciden.',
+        'weak-password': 'La contraseña es muy débil.',
+        'passwords-dont-match': 'Las contraseñas no coinciden.',
       };
       setState(() => _error = msgs[e.code] ?? e.message ?? 'Error desconocido');
     } catch (e) {
@@ -76,17 +73,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF5F7FB),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -97,14 +85,14 @@ class _AuthScreenState extends State<AuthScreen> {
                 const Icon(Icons.flight_takeoff_rounded, size: 64, color: Color(0xFF0F9D8D)),
                 const SizedBox(height: 16),
                 Text(
-                  _isLogin ? l10n.login : l10n.register,
+                  _isLogin ? 'Iniciar sesión' : 'Crear cuenta',
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF0B3D37)),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   _isLogin
-                      ? 'Accede a tus alertas desde cualquier dispositivo.'
-                      : 'Guarda tus alertas y recibi notificaciones en todos tus dispositivos.',
+                      ? 'Accedé a tus alertas desde cualquier dispositivo.'
+                      : 'Guardá tus alertas y recibí notificaciones en todos tus dispositivos.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Color(0xFF667085), fontSize: 14),
                 ),
@@ -117,19 +105,19 @@ class _AuthScreenState extends State<AuthScreen> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: const Color(0xFFB7E0C0)),
                     ),
-                    child: Column(
+                    child: const Column(
                       children: [
-                        const Icon(Icons.mark_email_read_rounded, color: Color(0xFF18864B), size: 32),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Cuenta creada!',
+                        Icon(Icons.mark_email_read_rounded, color: Color(0xFF18864B), size: 32),
+                        SizedBox(height: 8),
+                        Text(
+                          '¡Cuenta creada!',
                           style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF146C3A)),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4),
                         Text(
-                          'Te enviamos un email de verificacion. Abri el link que te llego para activar tu cuenta. ${l10n.spamWarning}',
+                          'Te enviamos un email de verificación. Abrí el link que te llegó para activar tu cuenta.',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Color(0xFF146C3A), fontSize: 13),
+                          style: TextStyle(color: Color(0xFF146C3A), fontSize: 13),
                         ),
                       ],
                     ),
@@ -137,14 +125,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => setState(() { _isLogin = true; _emailSent = false; _error = null; }),
-                    child: const Text('Ya verifique mi email, iniciar sesion', style: TextStyle(fontWeight: FontWeight.w700)),
+                    child: const Text('Ya verifiqué mi email, iniciar sesión', style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ] else ...[
                   TextField(
                     controller: _emailCtrl,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      hintText: l10n.email,
+                      hintText: 'Email',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -156,7 +144,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: _passCtrl,
                     obscureText: true,
                     decoration: InputDecoration(
-                      hintText: l10n.password,
+                      hintText: 'Contraseña',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -169,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       controller: _pass2Ctrl,
                       obscureText: true,
                       decoration: InputDecoration(
-                        hintText: l10n.repeatPassword,
+                        hintText: 'Repetir contraseña',
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -189,14 +177,14 @@ class _AuthScreenState extends State<AuthScreen> {
                       onPressed: _loading ? null : _submit,
                       child: _loading
                           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text(_isLogin ? l10n.enter : l10n.createAccount, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          : Text(_isLogin ? 'Ingresar' : 'Crear cuenta', style: const TextStyle(fontWeight: FontWeight.w800)),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () => setState(() { _isLogin = !_isLogin; _error = null; _emailSent = false; }),
                     child: Text(
-                      _isLogin ? l10n.noAccount : l10n.haveAccount,
+                      _isLogin ? '¿No tenés cuenta? Registrate' : '¿Ya tenés cuenta? Iniciar sesión',
                       style: const TextStyle(color: Color(0xFF0F9D8D), fontWeight: FontWeight.w700),
                     ),
                   ),

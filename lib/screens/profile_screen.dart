@@ -5,9 +5,14 @@ import '../l10n/app_localizations.dart';
 import '../main.dart';
 import 'auth_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   bool get _isAdmin {
     final email = FirebaseAuth.instance.currentUser?.email?.toLowerCase() ?? '';
     return email == 'descuentonadrian@gmail.com';
@@ -16,10 +21,11 @@ class ProfileScreen extends StatelessWidget {
   Future<void> _logout(BuildContext context) async {
     try {
       await FirebaseAuth.instance.signOut();
+      if (mounted) setState(() {});
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cerrar sesion: $e')),
+          SnackBar(content: Text('Error al cerrar sesion: ' + e.toString())),
         );
       }
     }
@@ -75,7 +81,14 @@ class ProfileScreen extends StatelessWidget {
                   height: 48,
                   child: FilledButton(
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => AuthScreen(
+                          onSuccess: () {
+                            Navigator.of(context).pop();
+                            setState(() {});
+                          },
+                        ),
+                      ),
                     ),
                     child: Text(l10n.login, style: const TextStyle(fontWeight: FontWeight.w800)),
                   ),

@@ -6,6 +6,7 @@ import '../services/alert_service.dart';
 import '../models/flight_alert.dart';
 import '../data/city_airports.dart';
 import 'auth_screen.dart';
+import 'create_alert_screen.dart';
 
 class MyAlertsScreen extends StatefulWidget {
   const MyAlertsScreen({super.key});
@@ -48,7 +49,14 @@ class _MyAlertsScreenState extends State<MyAlertsScreen> {
                   height: 48,
                   child: FilledButton(
                     onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => AuthScreen(
+                          onSuccess: () {
+                            Navigator.of(context).pop();
+                            setState(() {});
+                          },
+                        ),
+                      ),
                     ),
                     child: Text(l10n.loginToContinue, style: const TextStyle(fontWeight: FontWeight.w800)),
                   ),
@@ -87,7 +95,9 @@ class _MyAlertsScreenState extends State<MyAlertsScreen> {
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add_rounded),
           label: const Text('Nueva alerta', style: TextStyle(fontWeight: FontWeight.w800)),
-          onPressed: () => Navigator.of(context).pushNamed('/create-alert'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const CreateAlertScreen()),
+          ),
         ),
       ),
     );

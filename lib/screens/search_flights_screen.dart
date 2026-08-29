@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../data/city_airports.dart';
 import '../models/flight_alert.dart';
@@ -12,7 +13,16 @@ import '../widgets_destination_search_sheet.dart';
 enum TripType { oneWay, roundTrip }
 
 class SearchFlightsScreen extends StatefulWidget {
-  const SearchFlightsScreen({super.key});
+  final CityGroup? initialOrigin;
+  final CityGroup? initialDestination;
+  final bool autoSearch;
+
+  const SearchFlightsScreen({
+    super.key,
+    this.initialOrigin,
+    this.initialDestination,
+    this.autoSearch = false,
+  });
 
   @override
   State<SearchFlightsScreen> createState() => _SearchFlightsScreenState();
@@ -51,6 +61,13 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
       lowerBound: -0.08,
       upperBound: 0.08,
     );
+    _origin = widget.initialOrigin;
+    _destination = widget.initialDestination;
+
+    if (widget.autoSearch && _canSearch()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _search());
+    }
+
     _detectLocationAndLoadOffers();
   }
 
@@ -120,11 +137,12 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final user = FirebaseAuth.instance.currentUser;
+
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -148,75 +166,88 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
         ],
       ),
       actions: [
-        StreamBuilder<List<FlightNotification>>(
-          stream: _alertService.watchMyNotifications(),
-          builder: (context, snapshot) {
-            final unreadCount = snapshot.data
-                    ?.where((n) => !n.read && !n.isTest)
-                    .length ??
-                0;
-            if (unreadCount > 0 && !_notificationController.isAnimating) {
-              _notificationController.repeat(reverse: true);
-            } else if (unreadCount == 0 &&
-                _notificationController.isAnimating) {
-              _notificationController.stop();
-              _notificationController.reset();
-            }
+        if (user != null)
+          StreamBuilder<List<FlightNotification>>(
+            stream: _alertService.watchMyNotifications(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data
+                      ?.where((n) => !n.read && !n.isTest)
+                      .length ??
+                  0;
+              if (unreadCount > 0 && !_notificationController.isAnimating) {
+                _notificationController.repeat(reverse: true);
+              } else if (unreadCount == 0 &&
+                  _notificationController.isAnimating) {
+                _notificationController.stop();
+                _notificationController.reset();
+              }
 
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                AnimatedBuilder(
-                  animation: _notificationController,
-                  builder: (_, child) => Transform.rotate(
-                    angle: unreadCount > 0 ? _notificationController.value : 0,
-                    child: child,
-                  ),
-                  child: IconButton(
-                    tooltip: unreadCount > 0
-                        ? 'Tenes $unreadCount alerta${unreadCount == 1 ? '' : 's'} nueva${unreadCount == 1 ? '' : 's'}'
-                        : 'Mis alertas',
-                    icon: Icon(
-                      unreadCount > 0
-                          ? Icons.notifications_active_rounded
-                          : Icons.notifications_none_rounded,
-                      color: unreadCount > 0
-                          ? const Color(0xFFD92D20)
-                          : const Color(0xFF172033),
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedBuilder(
+                    animation: _notificationController,
+                    builder: (_, child) => Transform.rotate(
+                      angle: unreadCount > 0 ? _notificationController.value : 0,
+                      child: child,
                     ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const MyAlertsScreen()),
-                    ),
-                  ),
-                ),
-                if (unreadCount > 0)
-                  Positioned(
-                    right: 4,
-                    top: 5,
-                    child: Container(
-                      constraints:
-                          const BoxConstraints(minWidth: 18, minHeight: 18),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFD92D20),
-                        shape: BoxShape.circle,
+                    child: IconButton(
+                      tooltip: unreadCount > 0
+                          ? 'Tenes $unreadCount alerta${unreadCount == 1 ? '' : 's'} nueva${unreadCount == 1 ? '' : 's'}'
+                          : 'Mis alertas',
+                      icon: Icon(
+                        unreadCount > 0
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_none_rounded,
+                        color: unreadCount > 0
+                            ? const Color(0xFFD92D20)
+                            : const Color(0xFF172033),
                       ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        unreadCount > 9 ? '9+' : '$unreadCount',
-                        style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const MyAlertsScreen()),
                       ),
                     ),
                   ),
-              ],
-            );
-          },
-        ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 4,
+                      top: 5,
+                      child: Container(
+                        constraints:
+                            const BoxConstraints(minWidth: 18, minHeight: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFD92D20),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          unreadCount > 9 ? '9+' : '$unreadCount',
+                          style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          )
+        else
+          IconButton(
+            tooltip: 'Mis alertas',
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: Color(0xFF172033),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyAlertsScreen()),
+            ),
+          ),
         const SizedBox(width: 8),
       ],
     );
@@ -559,9 +590,6 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
     await _search();
   }
 
-  // ================================================================
-  // SEARCH CARD - CON BOTON SWAP Y MEJORAS ESTETICAS
-  // ================================================================
   Widget _buildSearchCard() {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
@@ -723,7 +751,7 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
                       padding: EdgeInsets.only(top: 10),
                       child: Center(
                         child: Text(
-                          'Los precios se muestran en dólares estadounidenses (USD)',
+                          'Los precios se muestran en dolares estadounidenses (USD)',
                           style: TextStyle(fontSize: 11, color: Color(0xFF98A2B3)),
                           textAlign: TextAlign.center,
                         ),
@@ -1194,7 +1222,6 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
   }
 
   Widget _buildCompactDealCard(FlightDeal deal) {
-    // Buscar la ciudad destino, no solo el aeropuerto
     final destCity = _cityGroupForAirportCode(deal.destinationAirportCode);
     final destName = destCity?.displayName ?? airportByCode(deal.destinationAirportCode)?.name ?? deal.destinationAirportCode;
     final destCountry = destCity?.country ?? '';
@@ -1358,22 +1385,6 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
         SizedBox(width: 6),
         Flexible(child: Text('Compara precios · Sin costo para buscar · Sin publicidad invasiva', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF667085), fontSize: 11))),
       ]),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return NavigationBar(
-      selectedIndex: 0,
-      height: 68,
-      onDestinationSelected: (index) {
-        if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAlertsScreen()));
-        if (index == 2) Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateAlertScreen()));
-      },
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.search_rounded), selectedIcon: Icon(Icons.search_rounded), label: 'Buscar'),
-        NavigationDestination(icon: Icon(Icons.notifications_none_rounded), selectedIcon: Icon(Icons.notifications_active_rounded), label: 'Mis alertas'),
-        NavigationDestination(icon: Icon(Icons.add_alert_rounded), selectedIcon: Icon(Icons.add_alert_rounded), label: 'Crear alerta'),
-      ],
     );
   }
 

@@ -1,8 +1,3 @@
-// travelpayouts_service.dart
-//
-// FIX: Migrado de Netlify a Cloudflare Worker
-// La URL base ahora apunta al worker de Cloudflare en vez de Netlify Functions.
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../data/city_airports.dart';
@@ -19,11 +14,9 @@ class NearbyDateDeal {
 
 class TravelpayoutsService {
   static const String _affiliateMarker = '761958';
-  // MIGRADO: de Netlify a Cloudflare Worker
   static const String _proxyBaseUrl = 'https://api-alertatrip.descuentonadrian.workers.dev';
   static const String _currency = 'usd';
 
-  /// Busca ofertas destacadas desde una ciudad (para el carrusel de inicio).
   Future<List<FlightDeal>> fetchSpecialOffers(String originCityId) async {
     final originAirports = airportsForCity(originCityId);
     if (originAirports.isEmpty) return [];
@@ -64,7 +57,6 @@ class TravelpayoutsService {
     }).toList();
   }
 
-  /// Busca vuelos entre dos ciudades.
   Future<List<FlightDeal>> searchDeals({
     required String originCityId,
     required String destinationCityId,
@@ -178,6 +170,7 @@ class TravelpayoutsService {
       'origin': originCode,
       'destination': destCode,
       'currency': _currency,
+      'trip_type': dateTo != null ? 'round_trip' : 'one_way',
       if (dateFrom != null) 'departure_at': _formatApiDate(dateFrom),
       if (dateTo != null) 'return_at': _formatApiDate(dateTo),
     };

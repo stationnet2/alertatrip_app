@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/city_airports.dart';
-import '../services/travelpayouts_service.dart';
-import '../models/flight_alert.dart';
+import '../services/location_service.dart';
+import 'search_flights_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
@@ -11,28 +11,63 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  final _travelpayoutsService = TravelpayoutsService();
-  List<FlightDeal>? _offers;
-  bool _loading = true;
+  final _locationService = LocationService();
+  CityGroup? _detectedCity;
+  bool _detectingLocation = true;
 
   @override
   void initState() {
     super.initState();
-    _loadOffers();
+    _detectLocation();
   }
 
-  Future<void> _loadOffers() async {
+  Future<void> _detectLocation() async {
+    CityGroup? city;
     try {
-      final offers = await _travelpayoutsService.fetchSpecialOffers('EZE');
-      if (!mounted) return;
-      setState(() {
-        _offers = offers;
-        _loading = false;
-      });
+      city = await _locationService
+          .detectNearestCity()
+          .timeout(const Duration(seconds: 8));
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _loading = false);
+      print('[Location] no se pudo detectar la ciudad: ' + e.toString());
+      city = null;
     }
+
+    if (!mounted) return;
+    setState(() {
+      _detectedCity = city;
+      _detectingLocation = false;
+    });
+  }
+
+  Future<void> _openCitySearch(CityGroup city) async {
+    if (_detectingLocation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Detectando tu ubicacion, espera un momento...')),
+      );
+      return;
+    }
+
+    final origin = _detectedCity ?? cityGroups.firstWhere(
+      (c) => c.id == 'buenos_aires',
+      orElse: () => cityGroups.first,
+    );
+
+    if (origin.id == city.id) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Elegi un destino diferente a tu ciudad de origen.')),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SearchFlightsScreen(
+          initialOrigin: origin,
+          initialDestination: city,
+          autoSearch: true,
+        ),
+      ),
+    );
   }
 
   @override
@@ -52,7 +87,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Toca cualquier destino para ver ofertas de vuelo.',
+            'Toca cualquier destino para ver ofertas de vuelo desde tu ciudad.',
             style: TextStyle(color: Color(0xFF667085)),
           ),
           const SizedBox(height: 16),
@@ -107,7 +142,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${city.country} * ${airports.map((a) => a.iataCode).join(', ')}',
+                          '${city.country} · ${airports.map((a) => a.iataCode).join(', ')}',
                           style: const TextStyle(color: Color(0xFF667085), fontSize: 13),
                         ),
                       ],
@@ -120,12 +155,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  void _openCitySearch(CityGroup city) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Buscando ofertas a ${city.displayName}...')),
     );
   }
 }
