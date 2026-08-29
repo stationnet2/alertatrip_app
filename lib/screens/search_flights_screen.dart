@@ -1487,7 +1487,7 @@ class _SearchFlightsScreenState extends State<SearchFlightsScreen>
   String _formatDuration(int minutes) => '${minutes ~/ 60}h ${minutes % 60}m';
 
   static const _tpMarker = '761958';
-  static const _tpTrs = '560037';
+  static const _tpTrs = '567185';
 
   String _affiliateDeepLink({required int campaignId, required int promoId, required String targetUrl}) {
     final encodedTarget = Uri.encodeComponent(targetUrl);

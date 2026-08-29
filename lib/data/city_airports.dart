@@ -431,3 +431,21 @@ double _haversineDistanceKm(double lat1, double lng1, double lat2, double lng2) 
 }
 
 double _degToRad(double deg) => deg * (3.141592653589793 / 180);
+
+
+/// Devuelve el nombre de display de una ciudad por su ID.
+String cityName(String cityGroupId) {
+  final group = cityGroups.where((c) => c.id == cityGroupId).firstOrNull;
+  return group?.displayName ?? cityGroupId;
+}
+
+/// Devuelve el codigo IATA del aeropuerto primario de una ciudad.
+String? primaryAirportCode(String cityGroupId) {
+  final group = cityGroups.where((c) => c.id == cityGroupId).firstOrNull;
+  if (group == null) return null;
+  for (final code in group.airportCodes) {
+    final airport = allAirports.where((a) => a.iataCode == code && a.isPrimary).firstOrNull;
+    if (airport != null) return airport.iataCode;
+  }
+  return group.airportCodes.firstOrNull;
+}
