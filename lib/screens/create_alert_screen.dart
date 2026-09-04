@@ -34,6 +34,9 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
   bool _flexibleDates = false;
   bool _saving = false;
   bool _roundTrip = true;
+  
+  // ✅ CORREGIDO: Variable de estado ahora es double para coincidir con el modelo
+  double _alertThresholdPercent = 15.0;
 
   @override
   void initState() {
@@ -71,8 +74,9 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
     final maxPrice = double.tryParse(_maxPriceCtrl.text);
     if (maxPrice != null && maxPrice < 20) {
       final l10n = AppLocalizations.of(context);
+      final errorMsg = l10n?.priceTooLow ?? 'El precio mínimo para una alerta es de USD 20.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.priceTooLow)),
+        SnackBar(content: Text(errorMsg)),
       );
       return;
     }
@@ -86,6 +90,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
         dateTo: _flexibleDates ? null : (_roundTrip ? _returnDate : null),
         flexibleDates: _flexibleDates,
         maxPrice: maxPrice,
+        alertThresholdPercent: _alertThresholdPercent, // ✅ Ahora coincide el tipo double
       );
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -184,6 +189,20 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
             'El precio minimo permitido es USD 20.',
             style: TextStyle(color: Color(0xFF667085), fontSize: 12),
           ),
+          
+          // ✅ NUEVO: Selector visual de umbral de notificación
+          const SizedBox(height: 16),
+          _buildThresholdPicker(
+            label: 'Avisarme si el precio baja un',
+            value: _alertThresholdPercent,
+            onTap: _pickThreshold,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Te notificaremos cuando encontremos una oferta que supere este descuento.',
+            style: TextStyle(color: Color(0xFF667085), fontSize: 12),
+          ),
+
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
@@ -193,7 +212,7 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
               child: _saving
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : Text(
-                      _isLoggedIn ? l10n.saveAlert : l10n.loginToSave,
+                      _isLoggedIn ? (l10n?.saveAlert ?? 'Guardar alerta') : (l10n?.loginToSave ?? 'Iniciar sesión para guardar'),
                       style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
             ),
@@ -201,6 +220,83 @@ class _CreateAlertScreenState extends State<CreateAlertScreen> {
         ],
       ),
     );
+  }
+
+  // ✅ CORREGIDO: El valor ahora es double
+  Widget _buildThresholdPicker({required String label, required double value, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE0E6EF)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.percent_rounded, color: Color(0xFF0F9D8D)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: const TextStyle(color: Color(0xFF667085), fontSize: 12)),
+                  Text(
+                    '${value.toInt()}%', // Mostramos como entero en la UI para que se vea limpio (ej: "15%")
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0B3D37),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF98A2B3)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ CORREGIDO: Las opciones y el diálogo ahora usan double
+  Future<void> _pickThreshold() async {
+    final options = [5.0, 10.0, 15.0, 20.0, 30.0];
+    final descriptions = [
+      '5% (Muy sensible)',
+      '10% (Recomendado)',
+      '15% (Estándar)',
+      '20%',
+      '30% (Solo grandes bajadas)'
+    ];
+
+    final selected = await showDialog<double>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Umbral de notificación'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: options.length,
+            itemBuilder: (ctx, i) {
+              final isSelected = options[i] == _alertThresholdPercent;
+              return ListTile(
+                title: Text(descriptions[i], style: const TextStyle(fontWeight: FontWeight.w700)),
+                trailing: isSelected ? const Icon(Icons.check_circle, color: Color(0xFF0F9D8D)) : null,
+                onTap: () => Navigator.pop(ctx, options[i]),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    if (selected != null) {
+      setState(() {
+        _alertThresholdPercent = selected;
+      });
+    }
   }
 
   Widget _buildCityPicker({required String label, required String? value, required VoidCallback onTap}) {

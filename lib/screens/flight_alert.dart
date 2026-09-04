@@ -2,6 +2,7 @@
 //
 // Representa una alerta configurada por el usuario: "avisame si baja
 // el precio de Córdoba a Buenos Aires en agosto, por debajo de $80.000".
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FlightAlert {
   final String id;
@@ -12,7 +13,7 @@ class FlightAlert {
   final DateTime? dateTo;
   final bool flexibleDates;
   final double? maxPrice; // null = "avisame de cualquier baja significativa"
-  final double alertThresholdPercent; // ej 20.0 = avisar si baja 20% o más
+  final int alertThresholdPercent; // ej 15 = avisar si baja 15% o más (Alineado con Web/Bot)
   final bool isActive;
   final DateTime createdAt;
   final double? lastKnownPrice; // para comparar y detectar bajas
@@ -27,7 +28,7 @@ class FlightAlert {
     this.dateTo,
     this.flexibleDates = false,
     this.maxPrice,
-    this.alertThresholdPercent = 15.0,
+    this.alertThresholdPercent = 15, // Valor por defecto como int
     this.isActive = true,
     required this.createdAt,
     this.lastKnownPrice,
@@ -39,32 +40,50 @@ class FlightAlert {
       'userId': userId,
       'originCityId': originCityId,
       'destinationCityId': destinationCityId,
-      'dateFrom': dateFrom?.toIso8601String(),
-      'dateTo': dateTo?.toIso8601String(),
+      'dateFrom': dateFrom != null ? Timestamp.fromDate(dateFrom!) : null,
+      'dateTo': dateTo != null ? Timestamp.fromDate(dateTo!) : null,
       'flexibleDates': flexibleDates,
       'maxPrice': maxPrice,
       'alertThresholdPercent': alertThresholdPercent,
       'isActive': isActive,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': FieldValue.serverTimestamp(),
       'lastKnownPrice': lastKnownPrice,
       'passengers': passengers,
     };
   }
 
+  // ==========================================
+  // FUNCIÓN AUXILIAR PARA PARSEAR FECHAS DE FORMA SEGURA
+  // Soporta tanto Timestamp (nuevo) como String (alertas viejas)
+  // ==========================================
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
   factory FlightAlert.fromFirestore(String id, Map<String, dynamic> data) {
     return FlightAlert(
       id: id,
-      userId: data['userId'],
-      originCityId: data['originCityId'],
-      destinationCityId: data['destinationCityId'],
-      dateFrom: data['dateFrom'] != null ? DateTime.parse(data['dateFrom']) : null,
-      dateTo: data['dateTo'] != null ? DateTime.parse(data['dateTo']) : null,
+      userId: data['userId'] ?? '',
+      originCityId: data['originCityId'] ?? data['origin'] ?? '', // Soporte legacy
+      destinationCityId: data['destinationCityId'] ?? data['destination'] ?? '', // Soporte legacy
+      dateFrom: _parseDate(data['dateFrom']),
+      dateTo: _parseDate(data['dateTo']),
       flexibleDates: data['flexibleDates'] ?? false,
-      maxPrice: data['maxPrice']?.toDouble(),
-      alertThresholdPercent: (data['alertThresholdPercent'] ?? 15.0).toDouble(),
+      maxPrice: (data['maxPrice'] as num?)?.toDouble(),
+      // Maneja tanto int como double que venga de Firestore
+      alertThresholdPercent: (data['alertThresholdPercent'] ?? 15).toInt(),
       isActive: data['isActive'] ?? true,
-      createdAt: DateTime.parse(data['createdAt']),
-      lastKnownPrice: data['lastKnownPrice']?.toDouble(),
+      createdAt: _parseDate(data['createdAt']) ?? DateTime.now(),
+      lastKnownPrice: (data['lastKnownPrice'] as num?)?.toDouble(),
       passengers: data['passengers'] ?? 1,
     );
   }

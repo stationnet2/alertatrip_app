@@ -91,37 +91,59 @@ class AlertService {
     return user.uid;
   }
 
-  /// Verifica si el email está confirmado
   bool get _isEmailVerified {
     return FirebaseAuth.instance.currentUser?.emailVerified ?? false;
   }
 
-  /// Devuelve cuántas alertas activas tiene el usuario
-  Future<int> _countActiveAlerts() async {
+  /// Valida el límite de alertas leyendo appConfig y contando TODAS las alertas
+  Future<void> _validateAlertLimit() async {
+    // 1. Obtener plan del usuario
+    final userDoc = await _db.collection('users').doc(_userId).get();
+    final userData = userDoc.data() ?? {};
+    String userPlan = userData['plan'] ?? 'free';
+
+    // Verificar si el plan premium expiró
+    if (userPlan == 'premium' && userData['planExpiresAt'] != null) {
+      final expiresAt = (userData['planExpiresAt'] as Timestamp).toDate();
+      if (expiresAt.isBefore(DateTime.now())) {
+        userPlan = 'free';
+      }
+    }
+
+    // 2. Obtener configuración global desde appConfig/system
+    final configDoc = await _db.collection('appConfig').doc('system').get();
+    final configData = configDoc.data() ?? {};
+    
+    final freePlan = configData['freePlan'] ?? {'maxAlerts': 2, 'name': 'Gratis'};
+    final premiumPlan = configData['premiumPlan'] ?? {'maxAlerts': 12, 'name': 'Premium'};
+
+    final planConfig = userPlan == 'premium' ? premiumPlan : freePlan;
+    final int maxAlerts = planConfig['maxAlerts'] ?? 2;
+    final String planName = planConfig['name'] ?? 'Gratis';
+
+    // 3. Contar TODAS las alertas del usuario (activas e inactivas)
     final snapshot = await _db
         .collection('flightAlerts')
         .where('userId', isEqualTo: _userId)
-        .where('isActive', isEqualTo: true)
+        .count()
         .get();
-    return snapshot.docs.length;
-  }
 
-  /// Devuelve el límite de alertas del usuario (lee de Firestore o usa default)
-  Future<int> _getAlertLimit() async {
-    final doc = await _db.collection('users').doc(_userId).get();
-    if (!doc.exists) return 2; // Default: 2 alertas gratis
-    final data = doc.data()!;
-    return (data['alertLimit'] as int?) ?? 2;
+    final int currentCount = snapshot.count ?? 0;
+
+    // 4. Validar
+    if (currentCount >= maxAlerts) {
+      throw Exception('Llegaste al límite de $maxAlerts alertas de tu plan $planName. Eliminá una o actualizá tu plan.');
+    }
   }
 
   /// Configura los permisos y tokens para las notificaciones push (FCM)
   Future<void> setupNotifications() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return; // No hay usuario, no configurar notificaciones
+    if (user == null) return;
     
     final messaging = FirebaseMessaging.instance;
-
     final settings = await messaging.requestPermission();
+    
     if (settings.authorizationStatus != AuthorizationStatus.authorized &&
         settings.authorizationStatus != AuthorizationStatus.provisional) {
       return;
@@ -162,7 +184,7 @@ class AlertService {
     }, SetOptions(merge: true));
   }
 
-  /// Guarda una alerta nueva con validaciones
+  /// Guarda una alerta nueva con validaciones actualizadas
   Future<String> saveAlert({
     required String originCityId,
     required String destinationCityId,
@@ -172,20 +194,15 @@ class AlertService {
     double? maxPrice,
     double? initialPrice,
     int passengers = 1,
+    double alertThresholdPercent = 15.0, // ✅ CORREGIDO: ahora es double
   }) async {
-    // Validar email verificado
     if (!_isEmailVerified) {
       throw Exception('Debés verificar tu email antes de crear alertas. Revisá tu correo.');
     }
 
-    // Validar límite de alertas
-    final currentCount = await _countActiveAlerts();
-    final limit = await _getAlertLimit();
-    if (currentCount >= limit) {
-      throw Exception('Llegaste al límite de $limit alertas. Para más, actualizá tu plan.');
-    }
+    // Validar límite usando la nueva lógica de appConfig
+    await _validateAlertLimit();
 
-    // Validar precio mínimo razonable (no permitir $1, $5, etc.)
     if (maxPrice != null && maxPrice < 20) {
       throw Exception('El precio mínimo para una alerta es de USD 20. Poné un precio realista.');
     }
@@ -199,6 +216,7 @@ class AlertService {
       dateTo: dateTo,
       flexibleDates: flexibleDates,
       maxPrice: maxPrice,
+      alertThresholdPercent: alertThresholdPercent,
       createdAt: DateTime.now(),
       lastKnownPrice: initialPrice,
       passengers: passengers,
@@ -234,13 +252,13 @@ class AlertService {
     return _db
         .collection('flightNotifications')
         .where('userId', isEqualTo: _userId)
+        .orderBy('createdAt', descending: true)
         .limit(100)
         .snapshots()
         .map((snapshot) {
           final notifications = snapshot.docs
               .map((doc) => FlightNotification.fromFirestore(doc.id, doc.data()))
               .toList();
-          notifications.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return notifications.take(limit).toList();
         });
   }
